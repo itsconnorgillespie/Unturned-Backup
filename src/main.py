@@ -2,6 +2,7 @@ import os
 import pathlib
 import sys
 import zipfile
+from fnmatch import fnmatch
 from zipfile import ZipFile
 from datetime import datetime, timezone
 from src.logger import get_logger
@@ -17,7 +18,12 @@ def get_filename(server_name: str) -> str:
     return f"{server_name}-{timestamp}.zip"
 
 
-def create_zip(source_directory: str, destination_directory: str) -> None:
+def check_excluded(name: str, exclude_patterns: tuple[str, ...]) -> bool:
+    """ Check if the provided filename or directory matches any configured glob pattern. """
+    return any(fnmatch(name, pattern) for pattern in exclude_patterns)
+
+
+def create_zip(source_directory: str, destination_directory: str, exclude_patterns: tuple[str, ...] = ()) -> None:
     """ Creates a lossless zip archive of the provided source directory in the provided destination directory. """
     source = pathlib.Path(source_directory)
     if not source.is_dir():
@@ -26,10 +32,22 @@ def create_zip(source_directory: str, destination_directory: str) -> None:
 
     files = 0
     with ZipFile(destination_directory, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for path in source.rglob("*"):
-            if path.is_file():
-                filename = path.relative_to(source)
-                archive.write(str(path), filename)
+        for root, directories, filenames in os.walk(source):
+            kept = []
+            for directory in directories:
+                if check_excluded(directory, exclude_patterns):
+                    logger.info(f"Skipping excluded directory. | {directory}")
+                else:
+                    kept.append(directory)
+            directories[:] = kept
+
+            for filename in filenames:
+                if check_excluded(filename, exclude_patterns):
+                    logger.info(f"Skipping excluded filename. | {filename}")
+                    continue
+                full_path = pathlib.Path(root) / filename
+                arcname = full_path.relative_to(source)
+                archive.write(str(full_path), str(arcname))
                 files += 1
 
     if files == 0:
@@ -47,11 +65,11 @@ def main() -> None:
     filename = get_filename(settings.SERVER_NAME)
     path = os.path.join(settings.TEMPORARY_DIRECTORY, filename)
 
-    logger.info(f"Zipping {settings.DATA_DIRECTORY} to {settings.TEMPORARY_DIRECTORY}")
-    create_zip(settings.DATA_DIRECTORY, path)
+    logger.info(f"Zipping. | {settings.DATA_DIRECTORY} -> {settings.TEMPORARY_DIRECTORY}")
+    create_zip(settings.DATA_DIRECTORY, path, settings.EXCLUDE_PATTERNS)
 
     client = get_s3_client(settings)
-    key = f"{settings.S3_PREFIX}{filename}"
+    key = f"{settings.SERVER_NAME}/{filename}"
     if not upload_s3_file(client, settings, path, key):
         os.remove(path)
         sys.exit(1)
