@@ -16,7 +16,13 @@ ENV PYTHONDONTWRITEBYTECODE=1
 COPY --from=builder /usr/local /usr/local
 COPY src ./src
 
-RUN addgroup --system runtime && adduser --system --ingroup runtime runtime
+RUN adduser \
+    --no-create-home \
+    --disabled-password \
+    --shell /bin/bash \
+    --uid 1000 \
+    --quiet \
+    runtime
 USER runtime
 
 ENTRYPOINT ["python", "-m", "src.main"]
