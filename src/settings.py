@@ -36,7 +36,7 @@ class Settings:
             DATA_DIRECTORY=os.environ.get("DATA_DIRECTORY", "/data"),
             TEMPORARY_DIRECTORY=os.environ.get("TEMPORARY_DIRECTORY", "/tmp/backup"),
             EXCLUDE_PATTERNS=excludes,
-            SERVER_NAME=os.environ.get("SERVER_NAME", "unturned-server1"),
+            SERVER_NAME=os.environ.get("SERVER_NAME", "server"),
             S3_ENDPOINT=endpoint,
             S3_BUCKET=bucket,
             S3_REGION=os.environ.get("S3_REGION", "auto"),
